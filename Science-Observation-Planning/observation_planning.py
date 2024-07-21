@@ -12,15 +12,17 @@ from astroplan import Observer, FixedTarget
 from astropy.time import Time
 from datetime import timezone  # Importing timezone
 
-def query_csv(filename, dec_range=None, ra_range=None, brightness_limit=None, max_e_pol=None, columns=None):
+def query_csv(filename, dec_range = None, ra_range = None, 
+    brightness_range = None, max_pol = None, max_e_pol = None, columns = None, 
+    sort_by = None, ascending = True):
     # Read the CSV file
     df = pd.read_csv(filename)
 
-    # Convert RA and DEC columns to SkyCoord objects
-    coords = SkyCoord(ra=df['RA (J2000)'], dec=df['Dec (J2000)'], unit=(u.hourangle, u.deg))
-    
     # Initialize filter with all True
     filters = [True] * len(df)
+
+    # Convert RA and DEC columns to SkyCoord objects
+    coords = SkyCoord(ra=df['RA (J2000)'], dec=df['Dec (J2000)'], unit=(u.hourangle, u.deg))
 
     if ra_range:
         # Convert RA range from hourangle to degrees if necessary and ensure it's a pure number
@@ -36,11 +38,20 @@ def query_csv(filename, dec_range=None, ra_range=None, brightness_limit=None, ma
         dec_end = dec_end.value if isinstance(dec_end, u.Quantity) else dec_end
         filters &= (coords.dec.degree >= dec_start) & (coords.dec.degree <= dec_end)
     
-    # if brightness_limit:
-    #     filters &= (df['Vmag'] >= brightness_limit)
+    if brightness_range:
+        brightness_max, brightness_min = brightness_range
+        brightness_filter = (df['Vmag'] >= brightness_max) & (df['Vmag'] <= brightness_min)
+        # brightness_filter = (df['Vmag'] >= brightness_max)
+        # brightness_filter = (df['Vmag'] <= brightness_min)
+        filters &= brightness_filter
     
-    if max_e_pol:
-        filters &= (df['e_Pol'] <= max_e_pol)
+    if max_e_pol is not None:
+        max_e_pol_filter = (df['e_Pol'] <= max_e_pol)
+        filters &= max_e_pol_filter
+
+    if max_pol is not None:
+        max_pol_filter = (df['Pol'] <= max_pol)
+        filters &= max_pol_filter
 
     # Apply the filters
     filtered_df = df[filters]
@@ -51,7 +62,14 @@ def query_csv(filename, dec_range=None, ra_range=None, brightness_limit=None, ma
             raise ValueError("One or more columns specified do not exist in the dataframe")
         filtered_df = filtered_df[columns]
 
+    # Sort the DataFrame if a sort column is specified
+    if sort_by is not None:
+        if sort_by not in filtered_df.columns:
+            raise ValueError(f"Column '{sort_by}' does not exist in the dataframe")
+        filtered_df = filtered_df.sort_values(by=sort_by, ascending=ascending)
+
     return filtered_df
+
 
 def query_vizier(identifier):
     try:
@@ -118,7 +136,8 @@ def query_simbad(identifier):
         print(f"An error occurred: {e}")
         return None
 
-def plot_altitude_for_targets(observer_location, targets, start_time, end_time):
+def plot_altitude_for_targets(observer_location, targets, start_time, end_time,
+        filename = "altitude_plot", dpi = 300):
     # Create an Observer object for the observatory location
     observer = Observer(location=observer_location)
     
@@ -152,6 +171,7 @@ def plot_altitude_for_targets(observer_location, targets, start_time, end_time):
     plt.legend(loc='best')
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(filename + ".png", dpi = dpi)
     plt.show()
 
 
