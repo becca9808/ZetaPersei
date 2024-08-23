@@ -174,4 +174,57 @@ def plot_altitude_for_targets(observer_location, targets, start_time, end_time,
     plt.savefig(filename + ".png", dpi = dpi)
     plt.show()
 
+def rotation_mueller(angle_rad):
+    cos2a = np.cos(2 * angle_rad)
+    sin2a = np.sin(2 * angle_rad)
+    return np.array([
+        [1, 0,      0,       0],
+        [0, cos2a,  sin2a,   0],
+        [0, -sin2a, cos2a,   0],
+        [0, 0,      0,       1]
+    ])
 
+def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude, instrument="VAMPIRES"):
+    """
+    Calculates the input Angle of Linear Polarization (AoLP) after propagating through specified rotations.
+    
+    Parameters:
+        on_sky_aolp (float): The initial angle of linear polarization on the sky in degrees.
+        parallactic_angle (float): The parallactic angle in degrees.
+        altitude (float): The altitude angle in degrees.
+        instrument (str, optional): The instrument being used. Default is "VAMPIRES".
+        
+    Returns:
+        float: The resulting angle of linear polarization in degrees after propagation.
+    """
+    # Convert degrees to radians
+    on_sky_aolp_rad = np.deg2rad(on_sky_aolp)
+    parallactic_angle_rad = np.deg2rad(parallactic_angle)
+    altitude_rad = np.deg2rad(altitude)
+    
+    # Define initial Stokes vector for linear polarization
+    # Assuming normalized intensity (I=1) and fully polarized light
+    S = np.array([
+        1,
+        np.cos(2 * on_sky_aolp_rad),
+        np.sin(2 * on_sky_aolp_rad),
+        0
+    ])
+    
+    # Apply rotations
+    M_parallactic = rotation_mueller(parallactic_angle_rad)
+    M_altitude = rotation_mueller(-altitude_rad)
+    
+    # Propagate Stokes vector through the rotations
+    S_prime = M_altitude @ (M_parallactic @ S)
+    
+    # Calculate resulting AoLP in radians
+    aolp_rad = 0.5 * np.arctan2(S_prime[2], S_prime[1])
+    
+    # Convert resulting AoLP to degrees
+    aolp_deg = np.rad2deg(aolp_rad)
+    
+    # Ensure AoLP is within [0, 180) degrees
+    aolp_deg = aolp_deg % 180
+    
+    return aolp_deg
