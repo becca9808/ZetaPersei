@@ -184,7 +184,15 @@ def rotation_mueller(angle_rad):
         [0, 0,      0,       1]
     ])
 
-def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude, instrument="VAMPIRES"):
+def UV_flip_mueller():
+    return np.array([[1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, -1, 0],
+                    [0, 0, 0, -1]
+    ])
+
+def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude, 
+    include_M3 = True, instrument = "VAMPIRES"):
     """
     Calculates the input Angle of Linear Polarization (AoLP) after propagating through specified rotations.
     
@@ -192,6 +200,7 @@ def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude, instrument="V
         on_sky_aolp (float): The initial angle of linear polarization on the sky in degrees.
         parallactic_angle (float): The parallactic angle in degrees.
         altitude (float): The altitude angle in degrees.
+        include_M3 (bool, optional): Whether to include the M3 UV flip. Default is True.
         instrument (str, optional): The instrument being used. Default is "VAMPIRES".
         
     Returns:
@@ -213,10 +222,14 @@ def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude, instrument="V
     
     # Apply rotations
     M_parallactic = rotation_mueller(parallactic_angle_rad)
+    if include_M3:
+        M_M3 = UV_flip_mueller()
+    else:
+        M_M3 = np.identity(4)
     M_altitude = rotation_mueller(-altitude_rad)
     
     # Propagate Stokes vector through the rotations
-    S_prime = M_altitude @ (M_parallactic @ S)
+    S_prime = S @ M_parallactic @ M_M3 @ M_altitude
     
     # Calculate resulting AoLP in radians
     aolp_rad = 0.5 * np.arctan2(S_prime[2], S_prime[1])
