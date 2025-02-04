@@ -11,6 +11,45 @@ import numpy as np
 from astroplan import Observer, FixedTarget
 from astropy.time import Time
 from datetime import timezone  # Importing timezone
+from astroquery.jplhorizons import Horizons
+
+def query_horizons(target_num,loc,obsdate,obstime):
+    ##target and location numbers are described in the horizons manual
+    ##date and time must be formatted as "2025-02-08" and "00:00" in UTC
+    yr, mo, dy = obsdate.split("-")
+    end = int(dy)+1
+    if end<10:
+        end = "0" + str(end)
+    obsdate_end = yr + "-" + mo + "-" + str(end)
+
+    obj = Horizons(id=target_num,location=loc,epochs={'start':obsdate, 'stop':obsdate_end,'step':'1h'})
+    eph = obj.ephemerides()
+
+    mo_dict = {
+        "01": "Jan",
+        "02": "Feb",
+        "03": "Mar",
+        "04": "Apr",
+        "05": "May",
+        "06": "Jun",
+        "07": "Jul",
+        "08": "Aug",
+        "09": "Sep",
+        "10": "Oct",
+        "11": "Nov",
+        "12": "Dec"
+    }
+
+    obsdate_query = yr + "-" + mo_dict[mo] + "-" + dy + " " + obstime
+
+    row = eph[np.where(eph["datetime_str"] == obsdate_query)]
+    ra = (row["RA"][0]*u.deg).to(u.hourangle)
+    dec = row["DEC"][0]*u.deg
+
+    c = SkyCoord(ra=ra,dec=dec)
+    print(f"RA: {c.to_string('hmsdms').split(" ")[0]}, Dec: {c.to_string('hmsdms').split(" ")[1]}")
+
+    return ra, dec
 
 def query_csv(filename, dec_range = None, ra_range = None, 
     brightness_range = None, max_pol = None, max_e_pol = None, columns = None, 
@@ -137,7 +176,7 @@ def query_simbad(identifier):
         return None
 
 def plot_altitude_for_targets(observer_location, targets, start_time, end_time,
-        filename = "altitude_plot", dpi = 300):
+        filename = "altitude_plot", ssobj = None, dpi = 300):
     # Create an Observer object for the observatory location
     observer = Observer(location=observer_location)
     
@@ -158,6 +197,18 @@ def plot_altitude_for_targets(observer_location, targets, start_time, end_time,
         altaz = observer.altaz(time_sampling, target)
         altitude = altaz.alt
         plt.plot(time_sampling.datetime, altitude, label=target.name)
+
+    # Add in solar system object if desired
+    if ssobj!=None:
+        targ, loc, ss_targ_name = ssobj
+        dt = np.abs((Time(start_time_utc) - Time(end_time_utc)).sec)/300/60
+        obj = Horizons(id=targ,location=loc,epochs={'start':start_time, 'stop':end_time,'step':"2m"})
+        eph = obj.ephemerides()
+
+        # Create a time array to sample the altitudes between start_time and end_time
+        time_sampling = start_time_utc + (end_time_utc - start_time_utc) * np.linspace(0, 1, len(eph["EL"]))
+
+        plt.plot(time_sampling.datetime,eph["EL"],label=ss_targ_name)
 
     # Set the x-axis to the defined range and format the labels
     plt.xlim(start_time_utc.datetime, end_time_utc.datetime)
