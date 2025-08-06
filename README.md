@@ -1,6 +1,6 @@
 # ZetaPersei
 
-Welcome to ZetaPersei. This is a preliminary release of two software tools meant to aid in the planned 2024 commisioning of Keck NIRC2 Polarimetry Mode. This repository is divided into two sections - calibration observation planning and science observation planning
+Welcome to ZetaPersei. This is a release of two software tools meant to aid in the planned 2024 commisioning of Keck NIRC2 Polarimetry Mode. This repository is divided into two sections - calibration observation planning and science observation planning
 
 ## Science Observation Planning
 
