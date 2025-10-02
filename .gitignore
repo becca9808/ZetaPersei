@@ -7,3 +7,6 @@ Block-Diagrams
 .vscode
 .conda
 .DS_store
+# Python cache
+__pycache__/
+*.pyc
