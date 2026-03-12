@@ -47,7 +47,7 @@ def query_horizons(target_num,loc,obsdate,obstime):
     dec = row["DEC"][0]*u.deg
 
     c = SkyCoord(ra=ra,dec=dec)
-    print(f"RA: {c.to_string('hmsdms').split(" ")[0]}, Dec: {c.to_string('hmsdms').split(" ")[1]}")
+    print(f"RA: {c.to_string('hmsdms').split(' ')[0]}, Dec: {c.to_string('hmsdms').split(' ')[1]}")
 
     return ra, dec
 
@@ -292,3 +292,38 @@ def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude,
     aolp_deg = aolp_deg % 180
     
     return aolp_deg
+
+# From VAMPIRES dpp
+def parallactic_angle_altaz(alt, az, lat):
+    r"""Calculate parallactic angle using the altitude/elevation and azimuth directly
+
+    Parameters
+    ----------
+    alt : float
+        altitude or elevation, in degrees
+    az : float
+        azimuth, in degrees CCW from North
+    lat : float, optional
+        latitude of observation in degrees, by default 19.823806
+
+    Returns
+    -------
+    float
+        parallactic angle, in degrees East of North
+    """
+    ## Astronomical Algorithms, Jean Meeus
+    # get angles, rotate az to S
+    _az = np.deg2rad(az) - np.pi
+    _alt = np.deg2rad(alt)
+    _lat = np.deg2rad(lat)
+    # calculate values ahead of time
+    sin_az, cos_az = np.sin(_az), np.cos(_az)
+    sin_alt, cos_alt = np.sin(_alt), np.cos(_alt)
+    sin_lat, cos_lat = np.sin(_lat), np.cos(_lat)
+    # get declination
+    dec = np.arcsin(sin_alt * sin_lat - cos_alt * cos_lat * cos_az)
+    # get hour angle
+    ha = np.arctan2(sin_az, cos_az * sin_lat + np.tan(_alt) * cos_lat)
+    # get parallactic angle
+    pa = np.arctan2(np.sin(ha), np.tan(_lat) * np.cos(dec) - np.sin(dec) * np.cos(ha))
+    return np.rad2deg(pa)
