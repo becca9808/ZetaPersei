@@ -46,8 +46,8 @@ def query_horizons(target_num,loc,obsdate,obstime):
     ra = (row["RA"][0]*u.deg).to(u.hourangle)
     dec = row["DEC"][0]*u.deg
 
-    c = SkyCoord(ra=ra,dec=dec)
-    print(f"RA: {c.to_string('hmsdms').split(' ')[0]}, Dec: {c.to_string('hmsdms').split(' ')[1]}")
+    c = SkyCoord(ra=ra,dec=dec).apply_space_motionto_string('hmsdms').split(" ")
+    print(f"RA: {c[0]}, Dec: {c[1]}")
 
     return ra, dec
 
@@ -143,7 +143,7 @@ def query_simbad(identifier):
     """
     This function queries SIMBAD for a given identifier and returns the associated RA and Dec in J2000 coordinates.
     RA is returned in hour angle units, and Dec is returned in degrees.
-    The function prints the RA and Dec in the original string format provided by SIMBAD.
+    The function prints the coordinates in sexagesimal format.
 
     Parameters:
     identifier (str): The identifier name to search for.
@@ -151,29 +151,34 @@ def query_simbad(identifier):
     Returns:
     tuple: A tuple containing the RA in hour angle units and Dec in degrees.
     """
-    try:
-        # Query SIMBAD for the object
-        result_table = Simbad.query_object(identifier)
-        
-        if result_table is None:
-            raise ValueError(f"No results found for identifier {identifier}.")
-        
-        # Extracting the RA and Dec values in string format
-        ra_string = result_table['RA'][0]  # RA in hours:minutes:seconds
-        dec_string = result_table['DEC'][0]  # Dec in degrees:minutes:seconds
-        
-        # Print out the original RA and Dec strings
-        print(f"RA: {ra_string}, Dec: {dec_string}")
-        
-        # Convert RA and Dec to Angle objects
-        ra_angle = Angle(ra_string, unit=u.hourangle)
-        dec_angle = Angle(dec_string, unit=u.deg)
-        
-        # Return RA as hour angle and Dec in degrees
-        return ra_angle.hour, dec_angle.degree
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+    result_table = Simbad.query_object(identifier)
+
+    if result_table is None or len(result_table) == 0:
+        raise ValueError(f"No results found for identifier {identifier}.")
+
+    colnames = set(result_table.colnames)
+
+    # astroquery/SIMBAD has returned both uppercase sexagesimal columns and
+    # lowercase degree columns across different client versions.
+    if {'RA', 'DEC'}.issubset(colnames):
+        ra_angle = Angle(result_table['RA'][0], unit=u.hourangle)
+        dec_angle = Angle(result_table['DEC'][0], unit=u.deg)
+        ra_string = result_table['RA'][0]
+        dec_string = result_table['DEC'][0]
+    elif {'ra', 'dec'}.issubset(colnames):
+        ra_angle = Angle(result_table['ra'][0], unit=u.deg)
+        dec_angle = Angle(result_table['dec'][0], unit=u.deg)
+        ra_string = ra_angle.to_string(unit=u.hourangle, sep=':', precision=2)
+        dec_string = dec_angle.to_string(unit=u.deg, sep=':', precision=2, alwayssign=True)
+    else:
+        raise KeyError(
+            "SIMBAD response does not include expected coordinate columns. "
+            f"Available columns: {sorted(result_table.colnames)}"
+        )
+
+    print(f"RA: {ra_string}, Dec: {dec_string}")
+
+    return ra_angle.hour, dec_angle.degree
 
 def plot_altitude_for_targets(observer_location, targets, start_time, end_time,
         filename = "altitude_plot", ssobj = None, dpi = 300):
@@ -292,6 +297,7 @@ def calculate_input_aolp(on_sky_aolp, parallactic_angle, altitude,
     aolp_deg = aolp_deg % 180
     
     return aolp_deg
+
 
 # From VAMPIRES dpp
 def parallactic_angle_altaz(alt, az, lat):
